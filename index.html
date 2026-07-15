@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Student Affairs Dashboard | Nixor</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">NIXOR COLLEGE</p>
+      <h1>Student Affairs Dashboard</h1>
+    </div>
+    <a href="/" class="text-link">Home</a>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>Admin Access</h2>
+      <div class="inline-form">
+        <input id="adminPin" type="password" placeholder="Enter admin PIN" />
+        <button id="savePinBtn" class="button secondary">Unlock</button>
+      </div>
+      <p id="adminMessage" class="muted small"></p>
+    </section>
+
+    <section id="dashboard" class="hidden">
+      <div class="grid-2">
+        <section class="card">
+          <h2>Create Today’s Attendance Session</h2>
+          <form id="sessionForm" class="form-grid">
+            <label>
+              Session title
+              <input id="title" required value="Student Affairs Attendance" />
+            </label>
+
+            <div class="grid-3">
+              <label>
+                Opens at
+                <input id="opensAt" type="datetime-local" required />
+              </label>
+              <label>
+                Late after
+                <input id="lateAfter" type="datetime-local" required />
+              </label>
+              <label>
+                Closes at
+                <input id="closesAt" type="datetime-local" required />
+              </label>
+            </div>
+
+            <div class="grid-3">
+              <label>
+                Latitude
+                <input id="latitude" type="number" step="any" required placeholder="24.8607" />
+              </label>
+              <label>
+                Longitude
+                <input id="longitude" type="number" step="any" required placeholder="67.0011" />
+              </label>
+              <label>
+                Allowed radius (metres)
+                <input id="radius" type="number" min="10" value="200" required />
+              </label>
+            </div>
+
+            <button type="button" id="useMyLocationBtn" class="button secondary">Use My Current Location</button>
+
+            <label>
+              On-time next step message
+              <textarea id="onTimeMessage">Attendance marked successfully. Please proceed to Student Affairs if you were specifically called.</textarea>
+            </label>
+
+            <label>
+              Late next step message
+              <textarea id="lateMessage">Your late arrival has been recorded. Please report to Student Affairs and follow the instructions provided.</textarea>
+            </label>
+
+            <label>
+              Closed message
+              <textarea id="closedMessage">Attendance is now closed. Please visit Student Affairs for manual verification.</textarea>
+            </label>
+
+            <button class="button primary" type="submit">Create Session & QR</button>
+          </form>
+        </section>
+
+        <section class="card">
+          <h2>Active QR Code</h2>
+          <div id="qrEmpty" class="notice neutral">Create a session to generate the QR code.</div>
+          <div id="qrPanel" class="hidden center">
+            <div id="qrcode"></div>
+            <p id="qrTitle" class="strong"></p>
+            <p id="qrLink" class="mono small"></p>
+            <button id="copyLinkBtn" class="button secondary">Copy Attendance Link</button>
+          </div>
+        </section>
+      </div>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <h2>Attendance Log</h2>
+            <p class="muted small">Refresh the log to view the latest submissions.</p>
+          </div>
+          <div class="actions compact">
+            <button id="refreshBtn" class="button secondary">Refresh</button>
+            <button id="exportBtn" class="button primary">Export Excel</button>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div><span id="totalCount">0</span><small>Total</small></div>
+          <div><span id="presentCount">0</span><small>On time</small></div>
+          <div><span id="lateCount">0</span><small>Late</small></div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date & Time</th>
+                <th>Student ID</th>
+                <th>Name</th>
+                <th>Program</th>
+                <th>Status</th>
+                <th>Late Reason</th>
+                <th>Distance</th>
+              </tr>
+            </thead>
+            <tbody id="logBody">
+              <tr><td colspan="7" class="muted center">No records loaded.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="/admin.js"></script>
+</body>
+</html>

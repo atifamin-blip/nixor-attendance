@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mark Attendance | Nixor</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">NIXOR COLLEGE</p>
+      <h1>Mark Attendance</h1>
+    </div>
+    <a href="/" class="text-link">Home</a>
+  </header>
+
+  <main class="container narrow">
+    <section class="card">
+      <div id="sessionStatus" class="notice neutral">Checking attendance session…</div>
+
+      <form id="attendanceForm" class="form-grid hidden">
+        <label>
+          Student ID
+          <input id="studentId" required maxlength="40" placeholder="e.g. NC-1024" />
+        </label>
+
+        <label>
+          Full name
+          <input id="studentName" required maxlength="100" placeholder="Your full name" />
+        </label>
+
+        <label>
+          Program / Class
+          <input id="program" maxlength="100" placeholder="Optional" />
+        </label>
+
+        <div id="lateReasonWrap" class="hidden">
+          <label>
+            Reason for being late
+            <textarea id="lateReason" maxlength="500" placeholder="Please explain why you are late"></textarea>
+          </label>
+        </div>
+
+        <label class="checkbox-row">
+          <input type="checkbox" id="consent" required />
+          <span>I allow this page to use my current location for attendance verification.</span>
+        </label>
+
+        <button id="submitBtn" class="button primary" type="submit">Verify Location & Mark Attendance</button>
+      </form>
+
+      <div id="result" class="hidden result-box"></div>
+    </section>
+  </main>
+
+  <script src="/student.js"></script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+const {getSupabase, json, distanceMeters} = require("./_shared");
+
+exports.handler = async event => {
+  if (event.httpMethod !== "POST") return json(405, {error:"Method not allowed."});
+
+  try {
+    const body = JSON.parse(event.body || "{}");
+    const required = ["sessionId","studentId","studentName","latitude","longitude"];
+    if (required.some(k => body[k] === undefined || body[k] === "")) {
+      return json(400, {error:"Please complete all required fields and allow location access."});
+    }
+
+    const supabase = getSupabase();
+    const {data:session, error:sessionError} = await supabase
+      .from("attendance_sessions").select("*").eq("id",body.sessionId).single();
+
+    if (sessionError || !session) return json(404, {error:"Attendance session not found."});
+
+    const now = new Date();
+    if (now < new Date(session.opens_at)) return json(400, {error:"Attendance has not opened yet."});
+    if (now > new Date(session.closes_at)) return json(400, {error:session.closed_message});
+
+    const status = now > new Date(session.late_after) ? "late" : "present";
+    if (status === "late" && !String(body.lateReason || "").trim()) {
+      return json(400, {error:"A reason is required because you are late."});
+    }
+
+    const distance = distanceMeters(
+      Number(session.latitude), Number(session.longitude),
+      Number(body.latitude), Number(body.longitude)
+    );
+
+    if (distance > Number(session.radius_meters)) {
+      return json(400, {error:`You are outside the allowed attendance area (${Math.round(distance)} metres away).`});
+    }
+
+    const nextStepMessage = status === "late" ? session.late_message : session.on_time_message;
+
+    const {data, error} = await supabase.from("attendance_records").insert({
+      session_id: session.id,
+      session_title: session.title,
+      student_id: String(body.studentId).trim(),
+      student_name: String(body.studentName).trim(),
+      program: String(body.program || "").trim(),
+      status,
+      late_reason: status === "late" ? String(body.lateReason).trim() : null,
+      latitude: Number(body.latitude),
+      longitude: Number(body.longitude),
+      distance_meters: distance,
+      location_accuracy: Number(body.accuracy || 0),
+      next_step_message: nextStepMessage
+    }).select().single();
+
+    if (error) {
+      if (error.code === "23505") return json(409, {error:"Attendance has already been marked for this session."});
+      throw error;
+    }
+
+    return json(200, {
+      status,
+      recordedAt:data.submitted_at,
+      nextStepMessage
+    });
+  } catch (error) {
+    return json(500, {error:error.message});
+  }
+};

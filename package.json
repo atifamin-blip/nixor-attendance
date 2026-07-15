@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Nixor Attendance</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="landing">
+    <section class="hero card">
+      <p class="eyebrow">NIXOR COLLEGE</p>
+      <h1>Student Affairs Attendance</h1>
+      <p class="muted">Simple QR-based attendance with location, timing, late reasons, and Excel export.</p>
+      <div class="actions">
+        <a class="button primary" href="/student.html">Mark Attendance</a>
+        <a class="button secondary" href="/admin.html">Student Affairs Dashboard</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

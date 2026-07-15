@@ -1,0 +1,172 @@
+const pinInput = document.getElementById("adminPin");
+const dashboard = document.getElementById("dashboard");
+const adminMessage = document.getElementById("adminMessage");
+const sessionForm = document.getElementById("sessionForm");
+const logBody = document.getElementById("logBody");
+
+let adminPin = sessionStorage.getItem("nixorAdminPin") || "";
+let activeSession = null;
+let records = [];
+
+function localDateTimeValue(date) {
+  const pad = n => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function setDefaultTimes() {
+  const now = new Date();
+  const open = new Date(now);
+  const late = new Date(now.getTime() + 10 * 60000);
+  const close = new Date(now.getTime() + 30 * 60000);
+  document.getElementById("opensAt").value = localDateTimeValue(open);
+  document.getElementById("lateAfter").value = localDateTimeValue(late);
+  document.getElementById("closesAt").value = localDateTimeValue(close);
+}
+
+async function verifyPin() {
+  adminPin = pinInput.value.trim();
+  const response = await fetch("/.netlify/functions/admin-records", {
+    headers: {"x-admin-pin": adminPin}
+  });
+
+  if (!response.ok) {
+    adminMessage.textContent = "Incorrect PIN.";
+    dashboard.classList.add("hidden");
+    return;
+  }
+
+  sessionStorage.setItem("nixorAdminPin", adminPin);
+  adminMessage.textContent = "Dashboard unlocked.";
+  dashboard.classList.remove("hidden");
+  await loadRecords();
+}
+
+document.getElementById("savePinBtn").addEventListener("click", verifyPin);
+
+if (adminPin) {
+  pinInput.value = adminPin;
+  verifyPin();
+}
+
+document.getElementById("useMyLocationBtn").addEventListener("click", () => {
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      document.getElementById("latitude").value = pos.coords.latitude;
+      document.getElementById("longitude").value = pos.coords.longitude;
+    },
+    () => alert("Location could not be detected. Please enter coordinates manually."),
+    {enableHighAccuracy:true, timeout:15000}
+  );
+});
+
+sessionForm.addEventListener("submit", async event => {
+  event.preventDefault();
+
+  const payload = {
+    title: document.getElementById("title").value.trim(),
+    opensAt: new Date(document.getElementById("opensAt").value).toISOString(),
+    lateAfter: new Date(document.getElementById("lateAfter").value).toISOString(),
+    closesAt: new Date(document.getElementById("closesAt").value).toISOString(),
+    latitude: Number(document.getElementById("latitude").value),
+    longitude: Number(document.getElementById("longitude").value),
+    radius: Number(document.getElementById("radius").value),
+    onTimeMessage: document.getElementById("onTimeMessage").value.trim(),
+    lateMessage: document.getElementById("lateMessage").value.trim(),
+    closedMessage: document.getElementById("closedMessage").value.trim()
+  };
+
+  const response = await fetch("/.netlify/functions/admin-create-session", {
+    method: "POST",
+    headers: {"Content-Type":"application/json","x-admin-pin":adminPin},
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json();
+
+  if (!response.ok) return alert(data.error || "Could not create the session.");
+
+  activeSession = data.session;
+  renderQr();
+  await loadRecords();
+});
+
+function renderQr() {
+  const base = location.origin;
+  const link = `${base}/student.html?session=${activeSession.id}`;
+  document.getElementById("qrEmpty").classList.add("hidden");
+  document.getElementById("qrPanel").classList.remove("hidden");
+  document.getElementById("qrcode").innerHTML = "";
+  new QRCode(document.getElementById("qrcode"), {text: link, width: 240, height: 240});
+  document.getElementById("qrTitle").textContent = activeSession.title;
+  document.getElementById("qrLink").textContent = link;
+  document.getElementById("copyLinkBtn").onclick = () => navigator.clipboard.writeText(link);
+}
+
+async function loadRecords() {
+  const response = await fetch("/.netlify/functions/admin-records", {
+    headers: {"x-admin-pin":adminPin}
+  });
+  const data = await response.json();
+
+  if (!response.ok) {
+    alert(data.error || "Unable to load attendance records.");
+    return;
+  }
+
+  records = data.records || [];
+  activeSession = data.latestSession || activeSession;
+  if (activeSession) renderQr();
+  renderTable();
+}
+
+function renderTable() {
+  document.getElementById("totalCount").textContent = records.length;
+  document.getElementById("presentCount").textContent = records.filter(r => r.status === "present").length;
+  document.getElementById("lateCount").textContent = records.filter(r => r.status === "late").length;
+
+  if (!records.length) {
+    logBody.innerHTML = `<tr><td colspan="7" class="muted center">No attendance has been submitted yet.</td></tr>`;
+    return;
+  }
+
+  logBody.innerHTML = records.map(r => `
+    <tr>
+      <td>${new Date(r.submitted_at).toLocaleString()}</td>
+      <td>${escapeHtml(r.student_id)}</td>
+      <td>${escapeHtml(r.student_name)}</td>
+      <td>${escapeHtml(r.program || "")}</td>
+      <td><span class="badge ${r.status}">${r.status === "late" ? "Late" : "On time"}</span></td>
+      <td>${escapeHtml(r.late_reason || "")}</td>
+      <td>${Math.round(r.distance_meters)} m</td>
+    </tr>
+  `).join("");
+}
+
+document.getElementById("refreshBtn").addEventListener("click", loadRecords);
+
+document.getElementById("exportBtn").addEventListener("click", () => {
+  if (!records.length) return alert("There are no records to export.");
+
+  const exportRows = records.map(r => ({
+    "Date & Time": new Date(r.submitted_at).toLocaleString(),
+    "Session": r.session_title,
+    "Student ID": r.student_id,
+    "Student Name": r.student_name,
+    "Program / Class": r.program || "",
+    "Status": r.status === "late" ? "Late" : "On time",
+    "Late Reason": r.late_reason || "",
+    "Distance (metres)": Math.round(r.distance_meters),
+    "Location Accuracy (metres)": Math.round(r.location_accuracy || 0),
+    "Next Step Message": r.next_step_message
+  }));
+
+  const sheet = XLSX.utils.json_to_sheet(exportRows);
+  const book = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(book, sheet, "Attendance");
+  XLSX.writeFile(book, `Nixor-Attendance-${new Date().toISOString().slice(0,10)}.xlsx`);
+});
+
+function escapeHtml(value = "") {
+  return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+}
+
+setDefaultTimes();
