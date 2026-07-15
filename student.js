@@ -1,118 +1,57 @@
-const params = new URLSearchParams(location.search);
-const sessionId = params.get("session");
+# Nixor Attendance Lite
 
-const statusBox = document.getElementById("sessionStatus");
-const form = document.getElementById("attendanceForm");
-const lateReasonWrap = document.getElementById("lateReasonWrap");
-const lateReason = document.getElementById("lateReason");
-const result = document.getElementById("result");
-const submitBtn = document.getElementById("submitBtn");
+A lightweight QR attendance system for Student Affairs.
 
-let currentSession = null;
-let currentStatus = null;
+## Features
 
-function showStatus(message, type = "neutral") {
-  statusBox.className = `notice ${type}`;
-  statusBox.textContent = message;
-}
+- Student Affairs creates a timed attendance session
+- A QR code is generated automatically
+- Students enter Student ID, name, and optional program/class
+- Browser location is checked against an allowed radius
+- Late students must provide a reason
+- Students receive a configurable next-step message
+- Duplicate attendance is blocked per session
+- Student Affairs can view the log and export it to Excel
 
-function getPosition() {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) return reject(new Error("Geolocation is not supported on this device."));
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy: true,
-      timeout: 15000,
-      maximumAge: 0
-    });
-  });
-}
+## 1. Create a Supabase project
 
-async function loadSession() {
-  if (!sessionId) {
-    showStatus("This attendance link is incomplete. Please scan the latest QR code.", "danger");
-    return;
-  }
+1. Create a new Supabase project.
+2. Open the SQL Editor.
+3. Run the contents of `supabase-schema.sql`.
+4. Copy the Project URL and the `service_role` key from project settings.
 
-  const response = await fetch(`/.netlify/functions/session?id=${encodeURIComponent(sessionId)}`);
-  const data = await response.json();
+Never place the service-role key in frontend JavaScript.
 
-  if (!response.ok) {
-    showStatus(data.error || "Unable to load the attendance session.", "danger");
-    return;
-  }
+## 2. Deploy to Netlify
 
-  currentSession = data.session;
-  currentStatus = data.currentStatus;
+Upload this folder to GitHub and connect the repository to Netlify, or use Netlify CLI.
 
-  if (currentStatus === "not_open") {
-    showStatus(`Attendance has not opened yet. It opens at ${new Date(currentSession.opens_at).toLocaleString()}.`, "warning");
-    return;
-  }
+Netlify will install the dependency from `package.json`.
 
-  if (currentStatus === "closed") {
-    showStatus(currentSession.closed_message, "danger");
-    result.classList.remove("hidden");
-    result.innerHTML = `<h2>Next Step</h2><p>${escapeHtml(currentSession.closed_message)}</p>`;
-    return;
-  }
+## 3. Add Netlify environment variables
 
-  if (currentStatus === "late") {
-    showStatus("Attendance is open, but you are late. A reason is required.", "warning");
-    lateReasonWrap.classList.remove("hidden");
-    lateReason.required = true;
-  } else {
-    showStatus("Attendance is open. Complete the form below.", "success");
-  }
+In Netlify Site configuration → Environment variables, add:
 
-  form.classList.remove("hidden");
-}
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `ADMIN_PIN`
 
-form.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  submitBtn.disabled = true;
-  submitBtn.textContent = "Checking location…";
+Choose a strong private PIN for Student Affairs.
 
-  try {
-    const position = await getPosition();
-    const payload = {
-      sessionId,
-      studentId: document.getElementById("studentId").value.trim(),
-      studentName: document.getElementById("studentName").value.trim(),
-      program: document.getElementById("program").value.trim(),
-      lateReason: lateReason.value.trim(),
-      latitude: position.coords.latitude,
-      longitude: position.coords.longitude,
-      accuracy: position.coords.accuracy
-    };
+## 4. Use the system
 
-    const response = await fetch("/.netlify/functions/submit-attendance", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(payload)
-    });
-    const data = await response.json();
+- Open `/admin.html`
+- Enter the admin PIN
+- Set the time window and location
+- Click **Use My Current Location** while standing at the approved attendance point
+- Create the session
+- Display or share the QR code
+- Students scan the QR and submit attendance
+- Refresh the log and export Excel when needed
 
-    if (!response.ok) throw new Error(data.error || "Attendance could not be marked.");
+## Important notes
 
-    form.classList.add("hidden");
-    statusBox.classList.add("hidden");
-    result.classList.remove("hidden");
-    result.innerHTML = `
-      <h2>${data.status === "late" ? "Late Arrival Recorded" : "Attendance Marked"}</h2>
-      <p><strong>Status:</strong> ${data.status === "late" ? "Late" : "On time"}</p>
-      <p><strong>Recorded at:</strong> ${new Date(data.recordedAt).toLocaleString()}</p>
-      <p><strong>Next step:</strong> ${escapeHtml(data.nextStepMessage)}</p>
-    `;
-  } catch (error) {
-    showStatus(error.message, "danger");
-  } finally {
-    submitBtn.disabled = false;
-    submitBtn.textContent = "Verify Location & Mark Attendance";
-  }
-});
-
-function escapeHtml(value = "") {
-  return value.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
-}
-
-loadSession().catch(() => showStatus("Unable to connect to the attendance service.", "danger"));
+- The website must run on HTTPS for browser geolocation. Netlify provides HTTPS.
+- Browser location can be spoofed by advanced users. This is a lightweight operational tool, not an exam-security system.
+- The Student ID is used to prevent duplicate attendance within the same session.
+- Location accuracy depends on the student's device and environment.
